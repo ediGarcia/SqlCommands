@@ -10,8 +10,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SqlCommandsTest", "SqlCommandsTest\SqlCommandsTest.csproj", "{03B1B8AB-06DE-4206-830E-5077AFE21D5F}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -22,10 +20,6 @@ Global
 		{CAF1A41F-2892-46CC-89F0-2182D0110ECB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{CAF1A41F-2892-46CC-89F0-2182D0110ECB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{CAF1A41F-2892-46CC-89F0-2182D0110ECB}.Release|Any CPU.Build.0 = Release|Any CPU
-		{03B1B8AB-06DE-4206-830E-5077AFE21D5F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{03B1B8AB-06DE-4206-830E-5077AFE21D5F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{03B1B8AB-06DE-4206-830E-5077AFE21D5F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{03B1B8AB-06DE-4206-830E-5077AFE21D5F}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
