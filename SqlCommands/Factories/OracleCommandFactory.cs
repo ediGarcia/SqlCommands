@@ -44,6 +44,9 @@ public class OracleCommandFactory : SqlCommandFactoryBase
         { typeof(Enum), "NUMBER(10)" }
     };
 
+    /// <inheritdoc />
+    protected override string ParameterPrefix { get; } = ":";
+
     #endregion
 
     #region Public Methods
@@ -80,13 +83,15 @@ public class OracleCommandFactory : SqlCommandFactoryBase
                 || !columnAttribute.Expression.IsNullOrWhiteSpace())
                 continue;
 
+            string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
-                columnsText.Append("@", propertyInfo.Name, " AS ", propertyMetadata.ColumnName, ", ");
-                parameters.Add(new($"@{propertyInfo.Name}", columnValue));
+                columnsText.Append(ParameterPrefix, propertyInfo.Name, " AS ", columnName, ", ");
+                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.UpsertIfNull))
-                columnsText.Append("NULL AS ", propertyMetadata.ColumnName, ", ");
+                columnsText.Append("NULL AS ", columnName, ", ");
         }
 
         if (columnsText.Length == 0)

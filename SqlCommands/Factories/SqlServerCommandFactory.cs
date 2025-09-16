@@ -42,4 +42,14 @@ public class SqlServerCommandFactory : SqlCommandFactoryBase
     };
 
     #endregion
+
+    #region Protected Methods
+
+    #region QuoteIdentifier
+    /// <inheritdoc />
+    protected override string QuoteIdentifier(string identifier) =>
+        $"[{identifier}]";
+    #endregion
+
+    #endregion
 }

@@ -86,17 +86,19 @@ public class MySqlCommandFactory : SqlCommandFactoryBase
                 && columnAttribute.IgnoreRules.HasFlag(IgnoreRule.UpsertIfNull))
                 continue;
 
-            columnsText.Append(propertyMetadata.ColumnName, ", ");
+            string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+
+            columnsText.Append(columnName, ", ");
 
             if (columnValue is null)
                 valuesText.Append("NULL, ");
             else
             {
-                valuesText.Append("@", propertyInfo.Name, ", ");
-                parameters.Add(new($"@{propertyInfo.Name}", columnValue));
+                valuesText.Append(ParameterPrefix, propertyInfo.Name, ", ");
+                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
             }
 
-            updateText.Append(propertyMetadata.ColumnName, " = VALUES(", propertyMetadata.ColumnName, "), ");
+            updateText.Append(columnName, " = VALUES(", columnName, "), ");
         }
 
         if (columnsText.Length == 0)
@@ -111,7 +113,7 @@ public class MySqlCommandFactory : SqlCommandFactoryBase
         updateText.Length -= 2;
 
         return new(
-            $"INSERT INTO {classMetadata.TableName} ({columnsText}) VALUES ({valuesText}) ON DUPLICATE KEY UPDATE {updateText};",
+            $"INSERT INTO {QuoteIdentifier(classMetadata.TableName)} ({columnsText}) VALUES ({valuesText}) ON DUPLICATE KEY UPDATE {updateText};",
             parameters.ToArray());
     }
     #endregion
@@ -138,6 +140,12 @@ public class MySqlCommandFactory : SqlCommandFactoryBase
         if (offset < 0)
             throw new ArgumentOutOfRangeException(nameof(offset), $"'{nameof(offset)}' must be greater than or equal to zero.");
     }
+    #endregion
+
+    #region QuoteIdentifier
+    /// <inheritdoc />
+    protected override string QuoteIdentifier(string identifier) =>
+        $"`{identifier}`";
     #endregion
 
     #endregion

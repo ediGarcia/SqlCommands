@@ -51,21 +51,37 @@ public abstract class SqlCommandFactoryBase
         { typeof(Enum), "INT" }
     };
 
+    /// <summary>
+    /// Gets the prefix used to denote parameters in SQL queries.
+    /// </summary>
+    protected virtual string ParameterPrefix { get; } = "@";
+
     #endregion
 
     #region Public Methods
 
     #region CreateDeleteCommand
     /// <summary>
-    /// Generates a SQL DELETE command based on the properties of the specified class type <typeparamref name="T"/>.
+    /// Creates a SQL DELETE command for the specified entity type, with optional filtering criteria.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="data"></param>
-    /// <param name="filter"></param>
-    /// <param name="checkPrimaryKeyOnly"></param>
-    /// <returns></returns>
-    /// <exception cref="ArgumentNullException"></exception>
-    /// <exception cref="InvalidOperationException"></exception>
+    /// <remarks>The generated DELETE command includes a WHERE clause based on the provided <paramref
+    /// name="data"/> and/or <paramref name="filter"/>. If <paramref name="checkPrimaryKeyOnly"/> is <see
+    /// langword="true"/>, only primary key columns are used for matching. Columns marked with <see
+    /// cref="IgnoreRule.DeleteAlways"/> are excluded from the WHERE clause.</remarks>
+    /// <typeparam name="T">The type of the entity for which the DELETE command is being created.</typeparam>
+    /// <param name="data">An instance of the entity containing values to match against the primary key or other columns.  If <paramref
+    /// name="data"/> is null, <paramref name="filter"/> must be provided.</param>
+    /// <param name="filter">An optional <see cref="SqlFilter"/> object specifying additional filtering criteria for the DELETE operation. If
+    /// <paramref name="filter"/> is null, <paramref name="data"/> must be provided.</param>
+    /// <param name="checkPrimaryKeyOnly">A boolean value indicating whether to restrict the DELETE operation to primary key columns only. If <see
+    /// langword="true"/>, only primary key columns are considered for matching; otherwise, all columns in the entity
+    /// are considered.</param>
+    /// <returns>A <see cref="SqlCommand"/> object representing the DELETE command, including the SQL statement and any
+    /// associated parameters.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if both <paramref name="data"/> and <paramref name="filter"/> are null, as this would result in deleting
+    /// all records.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if no primary key is defined and no filter criteria are specified, as this would result in deleting all
+    /// records.</exception>
     public virtual SqlCommand CreateDeleteCommand<T>(T data = default, SqlFilter filter = null, bool checkPrimaryKeyOnly = true)
     {
         if (data is null && filter is null)
@@ -91,14 +107,16 @@ public abstract class SqlCommandFactoryBase
                 || !columnAttribute.Expression.IsNullOrWhiteSpace()
                 || checkPrimaryKeyOnly && !columnAttribute.IsPrimaryKey)
                 continue;
+            
+            string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
 
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
-                whereClause.Append(propertyMetadata.ColumnName, " = @", propertyInfo.Name, " AND ");
-                parameters.Add(new($"@{propertyInfo.Name}", columnValue));
+                whereClause.Append(columnName, " = ", ParameterPrefix, propertyInfo.Name, " AND ");
+                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.DeleteIfNull))
-                whereClause.Append(propertyMetadata.ColumnName, " IS NULL AND ");
+                whereClause.Append(columnName, " IS NULL AND ");
         }
 
         if (whereClause.Length == 0)
@@ -107,7 +125,7 @@ public abstract class SqlCommandFactoryBase
         whereClause.Length -= 5; // Remove last " AND "
 
         StringBuilder commandText = new();
-        commandText.Append("DELETE FROM ", classMetadata.TableName, " WHERE ", whereClause);
+        commandText.Append("DELETE FROM ", QuoteIdentifier(classMetadata.TableName), " WHERE ", whereClause);
 
         return new(commandText.ToString(), parameters.ToArray());
     }
@@ -115,12 +133,18 @@ public abstract class SqlCommandFactoryBase
 
     #region CreateDropTableCommand
     /// <summary>
-    /// Generates a SQL DROP TABLE command for the specified table name.
+    /// Creates a SQL command to drop a table with optional conditions and constraints.
     /// </summary>
-    /// <param name="tableName"></param>
-    /// <param name="ignoreIfNotExists"></param>
-    /// <param name="mode"></param>
-    /// <returns></returns>
+    /// <remarks>The generated SQL command will include optional clauses based on the <paramref
+    /// name="ignoreIfNotExists"/> and <paramref name="mode"/> parameters. Use caution when using <see
+    /// cref="DropTableMode.Cascade"/> as it will drop all dependent objects.</remarks>
+    /// <param name="tableName">The name of the table to be dropped. This value must not be null or empty.</param>
+    /// <param name="ignoreIfNotExists">A value indicating whether the command should include the "IF EXISTS" clause to avoid errors if the table does
+    /// not exist. If <see langword="true"/>, the "IF EXISTS" clause is included; otherwise, it is omitted. The default
+    /// value is <see langword="true"/>.</param>
+    /// <param name="mode">Specifies the drop mode to use, such as cascading or restricting dependent objects. The default value is <see
+    /// cref="DropTableMode.Unsafe"/>.</param>
+    /// <returns>A <see cref="SqlCommand"/> object representing the SQL command to drop the specified table.</returns>
     public virtual SqlCommand CreateDropTableCommand(string tableName, bool ignoreIfNotExists = true, DropTableMode mode = DropTableMode.Unsafe)
     {
         string ignoreIfNotExistsText = ignoreIfNotExists ? "IF EXISTS " : string.Empty;
@@ -131,18 +155,29 @@ public abstract class SqlCommandFactoryBase
             _ => string.Empty,
         };
 
-        return new($"DROP TABLE {ignoreIfNotExistsText}{tableName}{modeText}", []);
+        return new($"DROP TABLE {ignoreIfNotExistsText}{QuoteIdentifier(tableName)}{modeText}", []);
     }
     #endregion
 
     #region CreateInsertCommand
     /// <summary>
-    /// Generates a SQL INSERT command based on the properties of the specified class type <typeparamref name="T"/>.
+    /// Creates a SQL <c>INSERT</c> command for the specified data object.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="data"></param>
-    /// <returns></returns>
-    /// <exception cref="InvalidOperationException"></exception>
+    /// <remarks>This method generates an <c>INSERT</c> statement based on the metadata of the specified type
+    /// <typeparamref name="T"/>. The metadata is retrieved from the <see cref="ClassMetadataCache"/> and may include
+    /// property-level attributes such as <see cref="SqlColumnAttribute"/> to define column mappings and rules. <para>
+    /// Properties marked with <see cref="IgnoreRule.InsertAlways"/> or with a non-empty <c>Expression</c> in their 
+    /// <see cref="SqlColumnAttribute"/> are excluded from the <c>INSERT</c> statement. If a property value is <see
+    /// langword="null"/>  and the <see cref="IgnoreRule.InsertIfNull"/> flag is not set, the column will be explicitly
+    /// set to <c>NULL</c>. </para> <para> If no valid properties are found for the <c>INSERT</c> statement, an <see
+    /// cref="InvalidOperationException"/> is thrown. </para></remarks>
+    /// <typeparam name="T">The type of the data object. The type must have metadata defined using <see cref="SqlColumnAttribute"/>.</typeparam>
+    /// <param name="data">The data object to insert. Cannot be <see langword="null"/>.</param>
+    /// <returns>A <see cref="SqlCommand"/> object representing the <c>INSERT</c> command, with the appropriate SQL text and
+    /// parameters.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if no valid properties with <see cref="SqlColumnAttribute"/> are found in the specified type
+    /// <typeparamref name="T"/>.</exception>
     public virtual SqlCommand CreateInsertCommand<T>(T data)
     {
         if (data is null)
@@ -163,15 +198,17 @@ public abstract class SqlCommandFactoryBase
                 || columnAttribute.IgnoreRules.HasFlag(IgnoreRule.InsertAlways))
                 continue;
 
+            string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
-                columns.Append(propertyMetadata.ColumnName, ", ");
-                values.Append("@", propertyInfo.Name, ", ");
-                parameters.Add(new($"@{propertyInfo.Name}", columnValue));
+                columns.Append(columnName, ", ");
+                values.Append(ParameterPrefix, propertyInfo.Name, ", ");
+                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.InsertIfNull))
             {
-                columns.Append(propertyMetadata.ColumnName, ", ");
+                columns.Append(columnName, ", ");
                 values.Append("NULL, ");
             }
         }
@@ -184,7 +221,7 @@ public abstract class SqlCommandFactoryBase
         values.Length -= 2;
 
         StringBuilder commandText = new();
-        commandText.Append("INSERT INTO ", classMetadata.TableName, " (", columns, ") VALUES (", values, ");");
+        commandText.Append("INSERT INTO ", QuoteIdentifier(classMetadata.TableName), " (", columns, ") VALUES (", values, ");");
 
         return new(commandText.ToString(), parameters.ToArray());
     }
@@ -192,11 +229,17 @@ public abstract class SqlCommandFactoryBase
 
     #region CreateNewTableCommand
     /// <summary>
-    /// Generates a SQL CREATE TABLE command based on the properties of the specified data type.
+    /// Creates a new <see cref="SqlCommand"/> that defines a SQL statement for creating a table based on the specified
+    /// data type's metadata.
     /// </summary>
-    /// <param name="dataType"></param>
-    /// <returns></returns>
-    /// <exception cref="InvalidOperationException"></exception>
+    /// <remarks>The method inspects the metadata of the provided data type to generate the SQL command.
+    /// The method will throw an exception if no valid properties are found or if the data type contains
+    /// unsupported property types.</remarks>
+    /// <param name="dataType">The <see cref="Type"/> representing the data model for which the table creation command will be generated.</param>
+    /// <returns>A <see cref="SqlCommand"/> containing the SQL statement to create a table that matches the structure of the
+    /// specified data type.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if the specified <paramref name="dataType"/> does not contain any valid properties,
+    /// or if a property type is not supported by the database.</exception>
     public virtual SqlCommand CreateNewTableCommand(Type dataType)
     {
         ClassMetadata classMetadata = ClassMetadataCache.GetClassMetadata(dataType);
@@ -210,7 +253,7 @@ public abstract class SqlCommandFactoryBase
             if (!columnAttribute.Expression.IsNullOrWhiteSpace())
                 continue;
 
-            string columnName = columnAttribute.Name ?? propertyInfo.Name;
+            string columnName = QuoteIdentifier(columnAttribute.Name ?? propertyInfo.Name);
             string columnType = columnAttribute.Type ?? GetSqlType(propertyInfo.PropertyType);
 
             columnsText.Append(columnName, " ", columnType);
@@ -228,7 +271,7 @@ public abstract class SqlCommandFactoryBase
             throw new InvalidOperationException($"No valid properties with '{nameof(SqlColumnAttribute)}' found in '{classMetadata.ClassType.Name}'.");
 
         columnsText.Length -= 2; // Removes last ", "
-        return new($"CREATE TABLE {classMetadata.TableName} ({columnsText})", []);
+        return new($"CREATE TABLE {QuoteIdentifier(classMetadata.TableName)} ({columnsText})", []);
 
         #region Inner Methods
 
@@ -250,16 +293,25 @@ public abstract class SqlCommandFactoryBase
 
     #region CreateSelectCommand
     /// <summary>
-    /// Generates a SQL SELECT command based on the properties of the specified class type <typeparamref name="T"/>.
+    /// Creates a SQL <c>SELECT</c> command for querying data from a database table based on the specified type and optional parameters.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="data"></param>
-    /// <param name="distinct"></param>
-    /// <param name="filter"></param>
-    /// <param name="offset"></param>
-    /// <param name="maxResults"></param>
-    /// <returns></returns>
-    /// <exception cref="InvalidOperationException"></exception>
+    /// <remarks>This method dynamically constructs a SQL <c>SELECT</c> query based on the metadata of the specified
+    /// type <typeparamref name="T"/>. The query includes all columns (except the ones mapped by <see cref="SqlIgnoreAttribute"/>) and applies
+    /// filtering conditions based on the provided <paramref name="data"/> and <paramref name="filter"/>. Pagination is
+    /// supported through the <paramref name="offset"/> and <paramref name="maxResults"/> parameters.</remarks>
+    /// <typeparam name="T">The type of the entity to query. The type must have metadata defined using <see cref="SqlColumnAttribute"/> and
+    /// <see cref="SqlTableAttribute"/>.</typeparam>
+    /// <param name="data">An optional instance of the entity type <typeparamref name="T"/>. If provided, its property values are used to
+    /// generate additional filtering conditions.</param>
+    /// <param name="distinct">A value indicating whether the <c>SELECT</c> query should include the <c>DISTINCT</c> keyword. <see langword="true"/> to
+    /// include <c>DISTINCT</c>; otherwise, <see langword="false"/>.</param>
+    /// <param name="filter">An optional <see cref="SqlFilter"/> object that specifies additional filtering conditions for the query.</param>
+    /// <param name="offset">The number of rows to skip before starting to return rows. Must be non-negative.</param>
+    /// <param name="maxResults">The maximum number of rows to return. Specify -1 to return all rows after the offset.</param>
+    /// <returns>A <see cref="SqlCommand"/> object representing the constructed SQL <c>SELECT</c> query, including any parameters for
+    /// filtering.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if no eligible properties are found in the specified type <typeparamref
+    /// name="T"/>.</exception>
     public virtual SqlCommand CreateSelectCommand<T>(T data = default, bool distinct = false, SqlFilter filter = null, int offset = 0, int maxResults = -1)
     {
         ValidateSelectPaginationInfo(offset, maxResults);
@@ -284,15 +336,18 @@ public abstract class SqlCommandFactoryBase
             if (columnAttribute.IgnoreRules.HasFlag(IgnoreRule.SelectAlways))
                 continue;
 
-            columns.Append(columnAttribute.Expression ?? propertyMetadata.ColumnName, " AS ", propertyInfo.Name, ", ");
+            string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+            string propertyName = QuoteIdentifier(propertyInfo.Name);
+
+            columns.Append(columnAttribute.Expression ?? columnName, " AS ", propertyName, ", ");
 
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
-                whereClause.Append(propertyInfo.Name, " = @", propertyInfo.Name, " AND ");
-                parameters.Add(new($"@{propertyInfo.Name}", columnValue));
+                whereClause.Append(propertyName, " = ", ParameterPrefix, propertyInfo.Name, " AND ");
+                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.SelectIfNull))
-                whereClause.Append(propertyMetadata.ColumnName, " IS NULL AND ");
+                whereClause.Append(columnName, " IS NULL AND ");
         }
 
         if (columns.Length == 0)
@@ -308,7 +363,7 @@ public abstract class SqlCommandFactoryBase
         if (distinct)
             commandText.Append("DISTINCT ");
 
-        commandText.Append(columns, " FROM ", classMetadata.TableName);
+        commandText.Append(columns, " FROM ", QuoteIdentifier(classMetadata.TableName));
 
         if (whereClause.Length > 0)
         {
@@ -333,13 +388,23 @@ public abstract class SqlCommandFactoryBase
 
     #region CreateUpdateCommand
     /// <summary>
-    /// Generates a SQL UPDATE command based on the properties of the specified class type <typeparamref name="T"/>.
+    /// Creates an <see cref="SqlCommand"/> to perform an update operation on a database table based on the specified
+    /// data object and optional filter criteria.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="data"></param>
-    /// <param name="filter"></param>
-    /// <returns></returns>
-    /// <exception cref="InvalidOperationException"></exception>
+    /// <remarks>This method generates an SQL <c>UPDATE</c> statement dynamically based on the metadata of the
+    /// specified data type. All properties (except the ones marked with <see cref="SqlColumnAttribute"/>) are used to construct the <c>SET</c>
+    /// clause, and primary key properties or the provided filter are used to construct the WHERE clause. If a property
+    /// value is null, its behavior depends on the <see cref="IgnoreRule"/> specified in the <see
+    /// cref="SqlColumnAttribute"/>.</remarks>
+    /// <typeparam name="T">The type of the data object representing the entity to be updated. The type may have metadata defined using
+    /// <see cref="SqlColumnAttribute"/> for its properties.</typeparam>
+    /// <param name="data">The data object containing the values to update.</param>
+    /// <param name="filter">An optional <see cref="SqlFilter"/> object specifying additional conditions for the update operation. If
+    /// provided, the filter is appended to the <c>WHERE</c> clause.</param>
+    /// <returns>An <see cref="SqlCommand"/> object representing the update operation. The command includes the SQL statement and
+    /// the associated parameters.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if no eligible properties are found in the data object, or if no primary key
+    /// is defined and no filter is specified, which would result in updating all records.</exception>
     public virtual SqlCommand CreateUpdateCommand<T>(T data, SqlFilter filter = null)
     {
         ClassMetadata classMetadata = ClassMetadataCache.GetClassMetadata(typeof(T));
@@ -363,17 +428,19 @@ public abstract class SqlCommandFactoryBase
                 || columnAttribute.IgnoreRules.HasFlag(IgnoreRule.UpdateAlways))
                 continue;
 
+            string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
                 if (columnAttribute.IsPrimaryKey)
-                    whereClause.Append(propertyMetadata.ColumnName, " = @", propertyInfo.Name, " AND ");
+                    whereClause.Append(columnName, " = ", ParameterPrefix, propertyInfo.Name, " AND ");
                 else
-                    setClause.Append(propertyMetadata.ColumnName, " = @", propertyInfo.Name, ", ");
+                    setClause.Append(columnName, " = ", ParameterPrefix, propertyInfo.Name, ", ");
 
-                parameters.Add(new($"@{propertyInfo.Name}", columnValue));
+                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.UpdateIfNull))
-                setClause.Append(propertyMetadata.ColumnName, " = NULL, ");
+                setClause.Append(columnName, " = NULL, ");
         }
 
         if (setClause.Length == 0)
@@ -385,7 +452,7 @@ public abstract class SqlCommandFactoryBase
         setClause.Length -= 2; // Removes last ", "
 
         StringBuilder commandText = new();
-        commandText.Append("UPDATE ", classMetadata.TableName, " SET ", setClause);
+        commandText.Append("UPDATE ", QuoteIdentifier(classMetadata.TableName), " SET ", setClause);
 
         if (whereClause.Length > 0)
         {
@@ -399,13 +466,18 @@ public abstract class SqlCommandFactoryBase
 
     #region CreateUpsertCommand
     /// <summary>
-    /// Generates a SQL UPSERT (UPDATE OR INSERT) command based on the properties of the specified class type <typeparamref name="T"/>.
+    /// Creates a SQL command to perform an upsert (merge) operation for the specified data entity.
     /// </summary>
-    /// <typeparam name="T"></typeparam>
-    /// <param name="data"></param>
-    /// <returns></returns>
-    /// <exception cref="ArgumentNullException"></exception>
-    /// <exception cref="InvalidOperationException"></exception>
+    /// <remarks>The upsert operation merges the specified data entity into the target table. If a matching
+    /// row exists based on the primary key, the row is updated; otherwise, a new row is inserted. The method uses
+    /// metadata to determine the table name, primary key, and columns to include in the operation.</remarks>
+    /// <typeparam name="T">The type of the data entity. The type must have metadata defined for its properties and table mapping.</typeparam>
+    /// <param name="data">The data entity to be upserted. Cannot be <see langword="null"/>.</param>
+    /// <returns>A <see cref="SqlCommand"/> configured to execute the upsert operation. The command includes the necessary SQL
+    /// text and parameters.</returns>
+    /// <exception cref="ArgumentNullException">Thrown if <paramref name="data"/> is <see langword="null"/>.</exception>
+    /// <exception cref="InvalidOperationException">Thrown if no eligible primary key column is found in the metadata for the specified type, or if no columns are
+    /// available to be set during the operation.</exception>
     public virtual SqlCommand CreateUpsertCommand<T>(T data)
     {
         if (data is null)
@@ -429,7 +501,7 @@ public abstract class SqlCommandFactoryBase
                 && columnAttribute.IgnoreRules.HasFlag(IgnoreRule.UpsertIfNull))
                 continue;
 
-            string columnName = propertyMetadata.ColumnName;
+            string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
 
             if (columnAttribute.IsPrimaryKey)
                 if (columnValue is null)
@@ -459,7 +531,7 @@ public abstract class SqlCommandFactoryBase
         StringBuilder commandText = new();
         List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Length);
 
-        commandText.Append("MERGE INTO ", classMetadata.TableName, " AS target ");
+        commandText.Append("MERGE INTO ", QuoteIdentifier(classMetadata.TableName), " AS target ");
         AppendUpsertSourceClause(data, commandText, parameters, classMetadata.PropertiesMetadata);
         commandText.Append("ON ", onClause, " WHEN MATCHED THEN UPDATE SET ", setClause, " WHEN NOT MATCHED THEN INSERT(",
             insertClause, ") VALUES(", valuesClause, ");");
@@ -474,12 +546,14 @@ public abstract class SqlCommandFactoryBase
 
     #region AppendSelectPaginationClause
     /// <summary>
-    /// Inserts pagination clauses into the provided SQL command text.
+    /// Appends a SQL pagination clause to the provided command text, using the specified offset and maximum number of
+    /// results.
     /// </summary>
-    /// <param name="commandText"></param>
-    /// <param name="tableAttribute"></param>
-    /// <param name="offset"></param>
-    /// <param name="maxResults"></param>
+    /// <param name="commandText">The <see cref="StringBuilder"/> to which the pagination clause will be appended.</param>
+    /// <param name="tableAttribute">The <see cref="SqlTableAttribute"/> containing metadata about the target table. This may influence the generated
+    /// SQL.</param>
+    /// <param name="offset">The number of rows to skip before starting to return rows. Must be zero or greater.</param>
+    /// <param name="maxResults">The maximum number of rows to return. If zero or less, no pagination clause is appended.</param>
     protected virtual void AppendSelectPaginationClause(StringBuilder commandText, SqlTableAttribute tableAttribute, int offset, int maxResults)
     {
         if (maxResults > 0)
@@ -517,8 +591,8 @@ public abstract class SqlCommandFactoryBase
 
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
-                columnsText.Append("@", propertyInfo.Name, " AS ", propertyMetadata.ColumnName, ", ");
-                parameters.Add(new($"@{propertyInfo.Name}", columnValue));
+                columnsText.Append(ParameterPrefix, propertyInfo.Name, " AS ", propertyMetadata.ColumnName, ", ");
+                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.UpsertIfNull))
                 columnsText.Append("NULL AS ", propertyMetadata.ColumnName, ", ");
@@ -547,6 +621,18 @@ public abstract class SqlCommandFactoryBase
         if (offset > 0 && maxResults <= 0)
             throw new ArgumentOutOfRangeException(nameof(maxResults), $"When '{nameof(offset)}' is greater than zero, '{nameof(maxResults)}' must be greater than zero.");
     }
+    #endregion
+
+    #region QuoteIdentifier
+    /// <summary>
+    /// Encloses the specified identifier in double quotes to ensure it is treated as a literal identifier.
+    /// </summary>
+    /// <remarks>This method is typically used to escape identifiers such as table or column names to prevent
+    /// conflicts with reserved keywords or invalid characters.</remarks>
+    /// <param name="identifier">The identifier to be quoted.</param>
+    /// <returns>A string representing the quoted identifier.</returns>
+    protected virtual string QuoteIdentifier(string identifier) =>
+        $"\"{identifier}\"";
     #endregion
 
     #endregion

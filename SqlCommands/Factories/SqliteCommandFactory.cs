@@ -87,20 +87,22 @@ public class SqliteCommandFactory : SqlCommandFactoryBase
                 && columnAttribute.IgnoreRules.HasFlag(IgnoreRule.UpsertIfNull))
                 continue;
 
-            columnsText.Append(propertyMetadata.ColumnName, ", ");
+            string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+
+            columnsText.Append(columnName, ", ");
 
             if (columnValue is null)
                 valuesText.Append("NULL, ");
             else
             {
-                valuesText.Append("@", propertyInfo.Name, ", ");
-                parameters.Add(new($"@{propertyInfo.Name}", columnValue));
+                valuesText.Append(ParameterPrefix, propertyInfo.Name, ", ");
+                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
             }
 
             if (columnAttribute.IsPrimaryKey)
-                conflictText.Append(propertyMetadata.ColumnName, ", ");
+                conflictText.Append(columnName, ", ");
             else
-                updateText.Append(propertyMetadata.ColumnName, " = excluded.", propertyMetadata.ColumnName, ", ");
+                updateText.Append(columnName, " = excluded.", columnName, ", ");
         }
 
         if (columnsText.Length == 0)
@@ -119,7 +121,7 @@ public class SqliteCommandFactory : SqlCommandFactoryBase
         updateText.Length -= 2;
 
         return new(
-            $"INSERT INTO {classMetadata.TableName} ({columnsText}) VALUES ({valuesText}) ON CONFLICT ({conflictText}) DO UPDATE SET {updateText};",
+            $"INSERT INTO {QuoteIdentifier(classMetadata.TableName)} ({columnsText}) VALUES ({valuesText}) ON CONFLICT ({conflictText}) DO UPDATE SET {updateText};",
             parameters.ToArray());
     }
     #endregion
