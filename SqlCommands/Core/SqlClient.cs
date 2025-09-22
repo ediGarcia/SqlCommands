@@ -1,4 +1,5 @@
-﻿using SqlCommands.Commands;
+﻿using System.Data;
+using SqlCommands.Commands;
 using SqlCommands.Factories;
 using SqlCommands.Metadata;
 using System.Data.Common;
@@ -54,6 +55,94 @@ public class SqlClient(DbConnection connection, SqlCommandFactoryBase commandFac
     /// <returns><see langword="true"/> if the data was successfully inserted; otherwise, <see langword="false"/>.</returns>
     public bool Insert<T>(T data) =>
         ExecuteNonQueryCommand(_commandFactory.CreateInsertCommand(data)) == 1;
+    #endregion
+
+    #region RunCommand
+    /// <summary>
+    /// Runs a user-defined SQL command directly against the database.
+    /// </summary>
+    /// <param name="commandData"></param>
+    /// <returns>The number of rows affected by the command.</returns>
+    public int RunCommand(SqlCommand commandData) =>
+        ExecuteNonQueryCommand(commandData);
+    #endregion
+
+    #region RunFetchCommand
+    /// <summary>
+    /// Executes a fetch user-defined command and returns the results as a <see cref="DataTable"/>.
+    /// </summary>
+    /// <remarks>If the command returns no results, this method will return an empty <see cref="DataTable"/>.</remarks>
+    /// <param name="commandData"></param>
+    /// <returns>The results fetched by the command.</returns>
+    public DataTable RunFetchCommand(SqlCommand commandData)
+    {
+        using DbCommand command = SetupCommand(commandData);
+        using DbDataReader reader = command.ExecuteReader();
+        DataTable dataTable = new();
+
+        while (reader.Read())
+        {
+            DataRow row = dataTable.NewRow();
+
+            for (int i = 0; i < reader.FieldCount; i++)
+                row[reader.GetName(i)] = reader.GetValue(i);
+
+            dataTable.Rows.Add(row);
+        }
+
+        return dataTable;
+    }
+    #endregion
+
+    #region RunTransaction*
+
+    #region RunTransaction(IEnumerable<SqlCommand>)
+    /// <summary>
+    /// Executes a series of SQL commands within a single transaction.
+    /// </summary>
+    /// <param name="commands"></param>
+    /// <returns>The number of rows affected by each command.</returns>
+    public int RunTransaction(IEnumerable<SqlCommand> commands)
+    {
+        using (_connection)
+        {
+            _connection.Open();
+
+            using DbTransaction transaction = _connection.BeginTransaction();
+            int totalAffectedRows = 0;
+
+            try
+            {
+                foreach (SqlCommand commandData in commands)
+                {
+                    using DbCommand command = SetupCommand(commandData);
+                    command.Transaction = transaction;
+                    totalAffectedRows += command.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
+
+            return totalAffectedRows;
+        }
+    }
+    #endregion
+
+    #region RunTransaction(params SqlCommand[])
+    /// <summary>
+    /// Executes one or more of SQL commands within a single transaction.
+    /// </summary>
+    /// <param name="commands"></param>
+    /// <returns>The number of rows affected by each command.</returns>
+    public int RunTransaction(params SqlCommand[] commands) =>
+        RunTransaction((IEnumerable<SqlCommand>)commands);
+    #endregion
+
     #endregion
 
     #region Select
