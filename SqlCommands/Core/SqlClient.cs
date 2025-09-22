@@ -57,14 +57,43 @@ public class SqlClient(DbConnection connection, SqlCommandFactoryBase commandFac
         ExecuteNonQueryCommand(_commandFactory.CreateInsertCommand(data)) == 1;
     #endregion
 
-    #region RunCommand
+    #region RunCommands*
+
+    #region RunCommands(IEnumerable<SqlCommand>)
     /// <summary>
-    /// Runs a user-defined SQL command directly against the database.
+    /// Executes a series of SQL commands and returns the total number of rows affected.
     /// </summary>
-    /// <param name="commandData"></param>
-    /// <returns>The number of rows affected by the command.</returns>
-    public int RunCommand(SqlCommand commandData) =>
-        ExecuteNonQueryCommand(commandData);
+    /// <param name="commands"></param>
+    /// <returns>The number of rows affected by each command.</returns>
+    public int RunCommands(IEnumerable<SqlCommand> commands)
+    {
+        int affectedRows = 0;
+
+        using (_connection)
+        {
+            _connection.Open();
+
+            foreach (SqlCommand commandData in commands)
+            {
+                using DbCommand command = SetupCommand(commandData);
+                affectedRows += Math.Max(0, command.ExecuteNonQuery());
+            }
+        }
+
+        return affectedRows;
+    }
+    #endregion
+
+    #region RunCommands(params SqlCommand[])
+    /// <summary>
+    /// Executes a series of SQL commands and returns the total number of rows affected.
+    /// </summary>
+    /// <param name="commands"></param>
+    /// <returns>The number of rows affected by each command.</returns>
+    public int RunCommands(params SqlCommand[] commands) =>
+        RunCommands((IEnumerable<SqlCommand>)commands);
+    #endregion
+
     #endregion
 
     #region RunFetchCommand
@@ -98,7 +127,7 @@ public class SqlClient(DbConnection connection, SqlCommandFactoryBase commandFac
 
     #region RunTransaction(IEnumerable<SqlCommand>)
     /// <summary>
-    /// Executes a series of SQL commands within a single transaction.
+    /// Executes a series of SQL commands within a single transaction and returns the total number of rows affected.
     /// </summary>
     /// <param name="commands"></param>
     /// <returns>The number of rows affected by each command.</returns>
@@ -117,7 +146,7 @@ public class SqlClient(DbConnection connection, SqlCommandFactoryBase commandFac
                 {
                     using DbCommand command = SetupCommand(commandData);
                     command.Transaction = transaction;
-                    totalAffectedRows += command.ExecuteNonQuery();
+                    totalAffectedRows += Math.Max(0, command.ExecuteNonQuery());
                 }
 
                 transaction.Commit();
@@ -135,7 +164,7 @@ public class SqlClient(DbConnection connection, SqlCommandFactoryBase commandFac
 
     #region RunTransaction(params SqlCommand[])
     /// <summary>
-    /// Executes one or more of SQL commands within a single transaction.
+    /// Executes one or more of SQL commands within a single transaction and returns the total number of rows affected.
     /// </summary>
     /// <param name="commands"></param>
     /// <returns>The number of rows affected by each command.</returns>
