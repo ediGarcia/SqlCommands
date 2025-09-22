@@ -84,11 +84,12 @@ public class OracleCommandFactory : SqlCommandFactoryBase
                 continue;
 
             string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+            string parameterName = ParameterPrefix + propertyInfo.Name;
 
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
-                columnsText.Append(ParameterPrefix, propertyInfo.Name, " AS ", columnName, ", ");
-                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
+                columnsText.Append(parameterName, " AS ", columnName, ", ");
+                parameters.Add(new(parameterName, columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.UpsertIfNull))
                 columnsText.Append("NULL AS ", columnName, ", ");

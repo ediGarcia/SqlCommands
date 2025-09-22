@@ -15,7 +15,7 @@ public class PropertyMetadata(PropertyInfo propertyInfo, SqlColumnAttribute colu
     /// <summary>
     /// Gets the name of the SQL column associated with the property.
     /// </summary>
-    public string ColumnName { get; } = columnAttribute?.Name ?? propertyInfo.Name;
+    public string ColumnName { get; } = columnAttribute.Name ?? propertyInfo.Name;
 
     /// <summary>
     /// Gets the property information.

@@ -109,11 +109,12 @@ public abstract class SqlCommandFactoryBase
                 continue;
             
             string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+            string parameterName = ParameterPrefix + propertyInfo.Name;
 
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
-                whereClause.Append(columnName, " = ", ParameterPrefix, propertyInfo.Name, " AND ");
-                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
+                whereClause.Append(columnName, " = ", parameterName, " AND ");
+                parameters.Add(new(parameterName, columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.DeleteIfNull))
                 whereClause.Append(columnName, " IS NULL AND ");
@@ -198,12 +199,13 @@ public abstract class SqlCommandFactoryBase
                 continue;
 
             string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+            string parameterName = ParameterPrefix + propertyInfo.Name;
 
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
                 columns.Append(columnName, ", ");
-                values.Append(ParameterPrefix, propertyInfo.Name, ", ");
-                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
+                values.Append(parameterName, ", ");
+                parameters.Add(new(parameterName, columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.InsertIfNull))
             {
@@ -337,13 +339,14 @@ public abstract class SqlCommandFactoryBase
 
             string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
             string propertyName = QuoteIdentifier(propertyInfo.Name);
+            string parameterName = ParameterPrefix + propertyInfo.Name;
 
             columns.Append(columnAttribute.Expression ?? columnName, " AS ", propertyName, ", ");
 
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
-                whereClause.Append(propertyName, " = ", ParameterPrefix, propertyInfo.Name, " AND ");
-                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
+                whereClause.Append(propertyName, " = ", parameterName, " AND ");
+                parameters.Add(new(parameterName, columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.SelectIfNull))
                 whereClause.Append(columnName, " IS NULL AND ");
@@ -428,15 +431,16 @@ public abstract class SqlCommandFactoryBase
                 continue;
 
             string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+            string parameterName = ParameterPrefix + propertyInfo.Name;
 
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
                 if (columnAttribute.IsPrimaryKey)
-                    whereClause.Append(columnName, " = ", ParameterPrefix, propertyInfo.Name, " AND ");
+                    whereClause.Append(columnName, " = ", parameterName, " AND ");
                 else
-                    setClause.Append(columnName, " = ", ParameterPrefix, propertyInfo.Name, ", ");
+                    setClause.Append(columnName, " = ", parameterName, ", ");
 
-                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
+                parameters.Add(new(parameterName, columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.UpdateIfNull))
                 setClause.Append(columnName, " = NULL, ");
@@ -449,15 +453,10 @@ public abstract class SqlCommandFactoryBase
             throw new InvalidOperationException("No primary key defined and no filter specified for the update operation. This would result in updating all records.");
 
         setClause.Length -= 2; // Removes last ", "
+        whereClause.Length -= 5; // Remove last " AND "
 
         StringBuilder commandText = new();
-        commandText.Append("UPDATE ", QuoteIdentifier(classMetadata.TableName), " SET ", setClause);
-
-        if (whereClause.Length > 0)
-        {
-            whereClause.Length -= 5; // Remove last " AND "
-            commandText.Append(" WHERE ", whereClause);
-        }
+        commandText.Append("UPDATE ", QuoteIdentifier(classMetadata.TableName), " SET ", setClause, " WHERE ", whereClause);
 
         return new(commandText.ToString(), parameters.ToArray());
     }
@@ -588,10 +587,12 @@ public abstract class SqlCommandFactoryBase
                 || !columnAttribute.Expression.IsNullOrWhiteSpace())
                 continue;
 
+            string parameterName = ParameterPrefix + propertyInfo.Name;
+
             if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
             {
-                columnsText.Append(ParameterPrefix, propertyInfo.Name, " AS ", propertyMetadata.ColumnName, ", ");
-                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
+                columnsText.Append(parameterName, " AS ", propertyMetadata.ColumnName, ", ");
+                parameters.Add(new(parameterName, columnValue));
             }
             else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.UpsertIfNull))
                 columnsText.Append("NULL AS ", propertyMetadata.ColumnName, ", ");

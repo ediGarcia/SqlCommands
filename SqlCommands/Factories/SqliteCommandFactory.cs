@@ -88,6 +88,7 @@ public class SqliteCommandFactory : SqlCommandFactoryBase
                 continue;
 
             string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+            string parameterName = ParameterPrefix + propertyInfo.Name;
 
             columnsText.Append(columnName, ", ");
 
@@ -95,8 +96,8 @@ public class SqliteCommandFactory : SqlCommandFactoryBase
                 valuesText.Append("NULL, ");
             else
             {
-                valuesText.Append(ParameterPrefix, propertyInfo.Name, ", ");
-                parameters.Add(new($"{ParameterPrefix}{propertyInfo.Name}", columnValue));
+                valuesText.Append(parameterName, ", ");
+                parameters.Add(new(parameterName, columnValue));
             }
 
             if (columnAttribute.IsPrimaryKey)
