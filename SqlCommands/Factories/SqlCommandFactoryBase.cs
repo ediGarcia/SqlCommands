@@ -169,8 +169,7 @@ public abstract class SqlCommandFactoryBase
     /// Properties marked with <see cref="IgnoreRule.InsertAlways"/> or with a non-empty <c>Expression</c> in their 
     /// <see cref="SqlColumnAttribute"/> are excluded from the <c>INSERT</c> statement. If a property value is <see
     /// langword="null"/>  and the <see cref="IgnoreRule.InsertIfNull"/> flag is not set, the column will be explicitly
-    /// set to <c>NULL</c>. </para> <para> If no valid properties are found for the <c>INSERT</c> statement, an <see
-    /// cref="InvalidOperationException"/> is thrown. </para></remarks>
+    /// set to <c>NULL</c>. </para> <para> If no valid properties are found for the <c>INSERT</c> statement, an <see cref="InvalidOperationException"/> is thrown. </para></remarks>
     /// <typeparam name="T">The type of the data object. The type must have metadata defined using <see cref="SqlColumnAttribute"/>.</typeparam>
     /// <param name="data">The data object to insert. Cannot be <see langword="null"/>.</param>
     /// <returns>A <see cref="SqlCommand"/> object representing the <c>INSERT</c> command, with the appropriate SQL text and
