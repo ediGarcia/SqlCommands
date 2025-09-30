@@ -212,19 +212,27 @@ public class SqlClient(DbConnection connection, SqlCommandFactoryBase commandFac
                 foreach (PropertyMetadata propertyMetadata in classMetadata.PropertiesMetadata)
                 {
                     object value = reader[propertyMetadata.PropertyInfo.Name];
+                    Type propertyType = propertyMetadata.PropertyInfo.PropertyType;
 
                     if (value == DBNull.Value)
                         value = null;
-                    else if (propertyMetadata.PropertyInfo.PropertyType == typeof(DateTime) || propertyMetadata.PropertyInfo.PropertyType == typeof(DateTime?))
+                    else if (propertyType == typeof(DateTime) || propertyType == typeof(DateTime?))
                         value = Convert.ToDateTime(value);
-                    else if (propertyMetadata.PropertyInfo.PropertyType == typeof(TimeSpan) || propertyMetadata.PropertyInfo.PropertyType == typeof(TimeSpan?))
+                    else if (propertyType == typeof(TimeSpan) || propertyType == typeof(TimeSpan?))
                         value = TimeSpan.Parse(value.ToString());
-                    else if (propertyMetadata.PropertyInfo.PropertyType.IsEnum)
+                    else if ((propertyType == typeof(bool) || propertyType == typeof(bool?)) && value is long longValue)
+                        value = longValue switch
+                        {
+                            0 => false,
+                            1 => true,
+                            _ => throw new InvalidCastException($"Cannot convert value '{longValue}' to System.Boolean.")
+                        };
+                    else if (propertyType.IsEnum)
                     {
                         if (value is string stringValue)
-                            value = Enum.Parse(propertyMetadata.PropertyInfo.PropertyType, stringValue);
+                            value = Enum.Parse(propertyType, stringValue);
                         else
-                            value = Enum.ToObject(propertyMetadata.PropertyInfo.PropertyType, value);
+                            value = Enum.ToObject(propertyType, value);
                     }
 
                     propertyMetadata.PropertyInfo.SetValue(result, value);

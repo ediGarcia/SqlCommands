@@ -8,6 +8,7 @@ public class SqlColumnAttribute(string name = null, string type = null, bool isP
     /// <summary>
     /// Gets the SQL expression used to compute the value of the column.
     /// </summary>
+    /// <remarks>Defining this property will make the current property SELECT-only.</remarks>
     public string Expression { get; } = expression;
 
     /// <summary>
