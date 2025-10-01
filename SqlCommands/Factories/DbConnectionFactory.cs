@@ -1,4 +1,5 @@
 ﻿using System.Data.Common;
+using HelperExtensions;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using MySql.Data.MySqlClient;
@@ -122,12 +123,14 @@ public static class DbConnectionFactory
     /// Creates a <see cref="SqliteConnection"/> instance with the data of the connection string.
     /// </summary>
     /// <param name="path"></param>
-    /// <param name="version"></param>
-    /// <param name="password"></param>
     /// <param name="enforceExisting">Indicates whether to enforce the existence of the database file.</param>
+    /// <param name="password"></param>
     /// <returns></returns>
-    public static SqliteConnection CreateSqliteConnection(string path, bool enforceExisting, string version = "3", string password = null) =>
-        CreateConnection<SqliteConnection>($"Data Source={path};Version={version};Password={password};FailIfMissing={enforceExisting}");
+    public static SqliteConnection CreateSqliteConnection(string path, bool enforceExisting, string password = null)
+    {
+        string passwordPart = password.IsNullOrWhiteSpace() ? String.Empty : $"Password={password};";
+        return CreateConnection<SqliteConnection>($"Data Source={path};{passwordPart}Mode={(enforceExisting ? "ReadWrite" : "ReadWriteCreate")}");
+    }
     #endregion
 
     #region CreateSqliteConnection(string)

@@ -99,6 +99,18 @@ public static class SqlClientFactory
         new(DbConnectionFactory.CreateSqliteConnection(connectionStringBuilder), new SqliteCommandFactory());
     #endregion
 
+    #region CreateSqliteClient(string, bool, [string], [string])
+    /// <summary>
+    /// Creates a <see cref="SqlClient"/> instance targeting a SQLite database.
+    /// </summary>
+    /// <param name="path"></param>
+    /// <param name="enforceExisting">Indicates whether to enforce the existence of the database file.</param>
+    /// <param name="password"></param>
+    /// <returns></returns>
+    public static SqlClient CreateSqliteClient(string path, bool enforceExisting, string password = null) =>
+        new(DbConnectionFactory.CreateSqliteConnection(path, enforceExisting, password), new SqliteCommandFactory());
+    #endregion
+
     #region CreateSqliteClient(string)
     /// <summary>
     /// Creates a <see cref="SqlClient"/> instance targeting a SQLite database.
