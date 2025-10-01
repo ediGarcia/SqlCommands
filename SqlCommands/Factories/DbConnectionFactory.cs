@@ -117,6 +117,19 @@ public static class DbConnectionFactory
         CreateConnection<SqliteConnection>(connectionStringBuilder.ConnectionString);
     #endregion
 
+    #region CreateSqliteConnection(string, bool, [string], [string])
+    /// <summary>
+    /// Creates a <see cref="SqliteConnection"/> instance with the data of the connection string.
+    /// </summary>
+    /// <param name="path"></param>
+    /// <param name="version"></param>
+    /// <param name="password"></param>
+    /// <param name="enforceExisting">Indicates whether to enforce the existence of the database file.</param>
+    /// <returns></returns>
+    public static SqliteConnection CreateSqliteConnection(string path, bool enforceExisting, string version = "3", string password = null) =>
+        CreateConnection<SqliteConnection>($"Data Source={path};Version={version};Password={password};FailIfMissing={enforceExisting}");
+    #endregion
+
     #region CreateSqliteConnection(string)
     /// <summary>
     /// Creates a <see cref="SqliteConnection"/> instance with the data of the connection string.
