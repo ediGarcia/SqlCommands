@@ -1,13 +1,13 @@
 ﻿namespace SqlCommands.Commands;
 
-public class SqlCommand(string text, SqlParameter[] parameters)
+public class SqlCommand(string text, IEnumerable<SqlParameter> parameters)
 {
     #region Properties
 
     /// <summary>
     /// Gets the parameters used in the SQL command.
     /// </summary>
-    public SqlParameter[] Parameters { get; } = parameters;
+    public IEnumerable<SqlParameter> Parameters { get; } = parameters;
 
     /// <summary>
     /// Gets the SQL command text.

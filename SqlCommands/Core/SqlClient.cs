@@ -193,7 +193,7 @@ public class SqlClient(DbConnection connection, SqlCommandFactoryBase commandFac
     /// <param name="maxResults">The maximum number of rows to return. A value of <c>-1</c> indicates no limit. Default is <c>-1</c>.</param>
     /// <returns>An <see cref="IEnumerable{T}"/> containing the entities retrieved from the database. The collection will be
     /// empty if no matching entities are found.</returns>
-    public IEnumerable<T> Select<T>(T data = default, bool distinct = false, SqlFilter filter = null, int offset = 0, int maxResults = -1) where T : new()
+    public IReadOnlyList<T> Select<T>(T data = default, bool distinct = false, SqlFilter filter = null, int offset = 0, int maxResults = -1) where T : new()
     {
         List<T> results = [];
         ClassMetadata classMetadata = ClassMetadataCache.GetClassMetadata(typeof(T));

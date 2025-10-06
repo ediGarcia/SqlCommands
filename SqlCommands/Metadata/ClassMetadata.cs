@@ -2,7 +2,7 @@
 
 namespace SqlCommands.Metadata;
 
-public class ClassMetadata(Type classType, SqlTableAttribute tableAttribute, PropertyMetadata[] propertiesMetadata)
+public class ClassMetadata(Type classType, SqlTableAttribute tableAttribute, IReadOnlyCollection<PropertyMetadata> propertiesMetadata)
 {
     #region Properties
 
@@ -14,7 +14,7 @@ public class ClassMetadata(Type classType, SqlTableAttribute tableAttribute, Pro
     /// <summary>
     /// Gets the metadata of the properties of the class.
     /// </summary>
-    public PropertyMetadata[] PropertiesMetadata { get; } = propertiesMetadata;
+    public IReadOnlyCollection<PropertyMetadata> PropertiesMetadata { get; } = propertiesMetadata;
 
     /// <summary>
     /// Gets the SQL table attribute associated with the class.

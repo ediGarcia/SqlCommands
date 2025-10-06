@@ -90,7 +90,7 @@ public abstract class SqlCommandFactoryBase
         ClassMetadata classMetadata = ClassMetadataCache.GetClassMetadata(typeof(T));
 
         StringBuilder whereClause = new();
-        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Length);
+        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Count);
 
         if (filter is not null)
         {
@@ -128,7 +128,7 @@ public abstract class SqlCommandFactoryBase
         StringBuilder commandText = new();
         commandText.Append("DELETE FROM ", QuoteIdentifier(classMetadata.TableName), " WHERE ", whereClause);
 
-        return new(commandText.ToString(), parameters.ToArray());
+        return new(commandText.ToString(), parameters);
     }
     #endregion
 
@@ -148,7 +148,7 @@ public abstract class SqlCommandFactoryBase
     /// <returns>A <see cref="SqlCommand"/> object representing the SQL command to drop the specified table.</returns>
     public virtual SqlCommand CreateDropTableCommand(string tableName, bool ignoreIfNotExists = true, DropTableMode mode = DropTableMode.Unsafe)
     {
-        string ignoreIfNotExistsText = ignoreIfNotExists ? "IF EXISTS " : string.Empty;
+        string ignoreIfNotExistsText = ignoreIfNotExists ? "IF EXISTS " : String.Empty;
         string modeText = mode switch
         {
             DropTableMode.Cascade => " CASCADE",
@@ -187,7 +187,7 @@ public abstract class SqlCommandFactoryBase
 
         StringBuilder columns = new();
         StringBuilder values = new();
-        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Length);
+        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Count);
 
         foreach (PropertyMetadata propertyMetadata in classMetadata.PropertiesMetadata)
         {
@@ -224,7 +224,7 @@ public abstract class SqlCommandFactoryBase
         StringBuilder commandText = new();
         commandText.Append("INSERT INTO ", QuoteIdentifier(classMetadata.TableName), " (", columns, ") VALUES (", values, ");");
 
-        return new(commandText.ToString(), parameters.ToArray());
+        return new(commandText.ToString(), parameters);
     }
     #endregion
 
@@ -321,7 +321,7 @@ public abstract class SqlCommandFactoryBase
 
         StringBuilder columns = new();
         StringBuilder whereClause = new();
-        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Length);
+        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Count);
 
         if (filter is not null)
         {
@@ -384,7 +384,7 @@ public abstract class SqlCommandFactoryBase
 
         AppendSelectPaginationClause(commandText, tableAttribute, offset, maxResults);
 
-        return new(commandText.ToString(), parameters.ToArray());
+        return new(commandText.ToString(), parameters);
     }
     #endregion
 
@@ -413,7 +413,7 @@ public abstract class SqlCommandFactoryBase
 
         StringBuilder setClause = new();
         StringBuilder whereClause = new();
-        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Length);
+        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Count);
 
         if (filter is not null)
         {
@@ -458,7 +458,7 @@ public abstract class SqlCommandFactoryBase
         StringBuilder commandText = new();
         commandText.Append("UPDATE ", QuoteIdentifier(classMetadata.TableName), " SET ", setClause, " WHERE ", whereClause);
 
-        return new(commandText.ToString(), parameters.ToArray());
+        return new(commandText.ToString(), parameters);
     }
     #endregion
 
@@ -527,14 +527,14 @@ public abstract class SqlCommandFactoryBase
         valuesClause.Length -= 2;
 
         StringBuilder commandText = new();
-        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Length);
+        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Count);
 
         commandText.Append("MERGE INTO ", QuoteIdentifier(classMetadata.TableName), " AS target ");
         AppendUpsertSourceClause(data, commandText, parameters, classMetadata.PropertiesMetadata);
         commandText.Append("ON ", onClause, " WHEN MATCHED THEN UPDATE SET ", setClause, " WHEN NOT MATCHED THEN INSERT(",
             insertClause, ") VALUES(", valuesClause, ");");
 
-        return new(commandText.ToString(), parameters.ToArray());
+        return new(commandText.ToString(), parameters);
     }
     #endregion
 
@@ -574,7 +574,7 @@ public abstract class SqlCommandFactoryBase
     /// <param name="parameters"></param>
     /// <param name="propertiesMetadata"></param>
     /// <exception cref="InvalidOperationException"></exception>
-    protected virtual void AppendUpsertSourceClause<T>(T data, StringBuilder commandText, List<SqlParameter> parameters, PropertyMetadata[] propertiesMetadata)
+    protected virtual void AppendUpsertSourceClause<T>(T data, StringBuilder commandText, List<SqlParameter> parameters, IReadOnlyCollection<PropertyMetadata> propertiesMetadata)
     {
         StringBuilder columnsText = new();
 

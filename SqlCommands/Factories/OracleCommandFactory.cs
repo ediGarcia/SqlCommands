@@ -70,7 +70,7 @@ public class OracleCommandFactory : SqlCommandFactoryBase
 
     #region AppendUpsertSourceClause
     /// <inheritdoc />
-    protected override void AppendUpsertSourceClause<T>(T data, StringBuilder commandText, List<SqlParameter> parameters, PropertyMetadata[] propertiesMetadata)
+    protected override void AppendUpsertSourceClause<T>(T data, StringBuilder commandText, List<SqlParameter> parameters, IReadOnlyCollection<PropertyMetadata> propertiesMetadata)
     {
         StringBuilder columnsText = new();
 

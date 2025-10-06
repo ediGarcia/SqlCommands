@@ -1,13 +1,13 @@
 ﻿namespace SqlCommands.Commands;
 
-public class SqlFilter(string text, SqlParameter[] parameters)
+public class SqlFilter(string text, IEnumerable<SqlParameter> parameters)
 {
     #region Properties
 
     /// <summary>
     /// Gets the parameters of the filter.
     /// </summary>
-    public SqlParameter[] Parameters { get; } = parameters;
+    public IEnumerable<SqlParameter> Parameters { get; } = parameters;
 
     /// <summary>
     /// Gets the text of the filter.

@@ -55,13 +55,11 @@ public class SqliteCommandFactory : SqlCommandFactoryBase
     /// <inheritdoc />
     /// <remarks>SQLite only supports unsafe table drop.</remarks>
     /// <exception cref="NotSupportedException"></exception>
-    public override SqlCommand CreateDropTableCommand(string tableName, bool ignoreIfNotExists = true, DropTableMode mode = DropTableMode.Unsafe)
-    {
-        if (mode != DropTableMode.Unsafe)
-            throw new NotSupportedException($"SQLite only supports {nameof(DropTableMode.Unsafe)} table drop.");
+    public override SqlCommand CreateDropTableCommand(string tableName, bool ignoreIfNotExists = true, DropTableMode mode = DropTableMode.Unsafe) =>
+        mode != DropTableMode.Unsafe
+            ? throw new NotSupportedException($"SQLite only supports {nameof(DropTableMode.Unsafe)} table drop.")
+            : base.CreateDropTableCommand(tableName, ignoreIfNotExists, mode);
 
-        return base.CreateDropTableCommand(tableName, ignoreIfNotExists, mode);
-    }
     #endregion
 
     #region CreateUpsertCommand
@@ -74,7 +72,7 @@ public class SqliteCommandFactory : SqlCommandFactoryBase
         StringBuilder valuesText = new();
         StringBuilder conflictText = new();
         StringBuilder updateText = new();
-        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Length);
+        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Count);
 
         foreach (PropertyMetadata propertyMetadata in classMetadata.PropertiesMetadata)
         {
@@ -121,9 +119,7 @@ public class SqliteCommandFactory : SqlCommandFactoryBase
         conflictText.Length -= 2;
         updateText.Length -= 2;
 
-        return new(
-            $"INSERT INTO {QuoteIdentifier(classMetadata.TableName)} ({columnsText}) VALUES ({valuesText}) ON CONFLICT ({conflictText}) DO UPDATE SET {updateText};",
-            parameters.ToArray());
+        return new($"INSERT INTO {QuoteIdentifier(classMetadata.TableName)} ({columnsText}) VALUES ({valuesText}) ON CONFLICT ({conflictText}) DO UPDATE SET {updateText};", parameters);
     }
     #endregion
 
