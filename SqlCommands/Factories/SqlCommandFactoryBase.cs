@@ -60,6 +60,66 @@ public abstract class SqlCommandFactoryBase
 
     #region Public Methods
 
+    #region CreateCountCommand
+    /// <summary>
+    /// Creates a SQL command to count rows in a table based on the specified entity type and optional filtering criteria.
+    /// </summary>
+    /// <remarks>This method dynamically constructs a SQL <c>SELECT COUNT</c> query based on the metadata of the specified
+    /// type <typeparamref name="T"/>. The query includes all columns (except the ones mapped by <see cref="SqlIgnoreAttribute"/>) and applies
+    /// filtering conditions based on the provided <paramref name="data"/> and <paramref name="filter"/>.</remarks>
+    /// <typeparam name="T">The type of the entity to query. The type may have metadata defined using <see cref="SqlColumnAttribute"/> and
+    /// <see cref="SqlTableAttribute"/>.</typeparam>
+    /// <param name="data">An optional instance of the entity type <typeparamref name="T"/>. If provided, its property values are used to
+    /// generate additional filtering conditions.</param>
+    /// <param name="filter">An optional <see cref="SqlFilter"/> object that specifies additional filtering conditions for the query.</param>
+    /// <returns>A <see cref="SqlCommand"/> object representing the constructed SQL <c>SELECT COUNT</c> query, including any parameters for
+    /// filtering.</returns>
+    public virtual SqlCommand CreateCountCommand<T>(T data = default, SqlFilter filter = null)
+    {
+        ClassMetadata classMetadata = ClassMetadataCache.GetClassMetadata(typeof(T));
+
+        StringBuilder whereClause = new();
+        List<SqlParameter> parameters = new(classMetadata.PropertiesMetadata.Count);
+
+        if (filter is not null)
+        {
+            whereClause.Append(filter.Text, " AND ");
+            parameters.AddRange(filter.Parameters);
+        }
+
+        foreach (PropertyMetadata propertyMetadata in classMetadata.PropertiesMetadata)
+        {
+            PropertyInfo propertyInfo = propertyMetadata.PropertyInfo;
+            SqlColumnAttribute columnAttribute = propertyMetadata.ColumnAttribute;
+
+            if (columnAttribute.IgnoreRules.HasFlag(IgnoreRule.SelectAlways))
+                continue;
+
+            string columnName = QuoteIdentifier(propertyMetadata.ColumnName);
+            string parameterName = ParameterPrefix + propertyInfo.Name;
+
+            if (propertyInfo.GetValueOrDefault(data) is { } columnValue)
+            {
+                whereClause.Append(columnName, " = ", parameterName, " AND ");
+                parameters.Add(new(parameterName, columnValue));
+            }
+            else if (!columnAttribute.IgnoreRules.HasFlag(IgnoreRule.SelectIfNull))
+                whereClause.Append(columnName, " IS NULL AND ");
+        }
+
+        StringBuilder commandText = new();
+        commandText.Append("SELECT COUNT(*) AS ", QuoteIdentifier("Count") ," FROM ", QuoteIdentifier(classMetadata.TableName));
+
+        if (whereClause.Length > 0)
+        {
+            whereClause.Length -= 5; // Remove last " AND "
+            commandText.Append(" WHERE ", whereClause);
+        }
+
+        return new(commandText.ToString(), parameters);
+    }
+    #endregion
+
     #region CreateDeleteCommand
     /// <summary>
     /// Creates a SQL DELETE command for the specified entity type, with optional filtering criteria.

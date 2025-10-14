@@ -1,7 +1,7 @@
-﻿using System.Data;
-using SqlCommands.Commands;
+﻿using SqlCommands.Commands;
 using SqlCommands.Factories;
 using SqlCommands.Metadata;
+using System.Data;
 using System.Data.Common;
 
 #pragma warning disable CS8604
@@ -14,6 +14,37 @@ public class SqlClient(DbConnection connection, SqlCommandFactoryBase commandFac
     private readonly DbConnection _connection = connection;
 
     #region Public Methods
+
+    #region Count
+    /// <summary>
+    /// Counts the number of records in the database that match the specified criteria.
+    /// </summary>
+    /// <remarks>The method uses the provided <paramref name="data"/> instance, if specified, to infer query
+    /// parameters based on its properties. The <paramref name="filter"/> parameter allows for additional filtering
+    /// criteria to be applied to the query.</remarks>
+    /// <typeparam name="T">The type of the entities to retrieve. The type must have a corresponding database mapping.</typeparam>
+    /// <param name="data">An optional instance of the entity type <typeparamref name="T"/> to use as a template for the query. Default is
+    /// <see langword="default"/>.</param>
+    /// <param name="filter">An optional <see cref="SqlFilter"/> object to apply filtering criteria to the query. Default is <see
+    /// langword="null"/>.</param>
+    /// <returns>An <see cref="Int32"/> representing the number of records in the database that match the criteria.</returns>
+    public int Count<T>(T data = default, SqlFilter filter = null)
+    {
+        using (_connection)
+        {
+            _connection.Open();
+
+            using DbCommand command = SetupCommand(_commandFactory.CreateCountCommand(data, filter));
+            using DbDataReader reader = command.ExecuteReader();
+            int result = 0;
+
+            if (reader.Read())
+                result = reader.GetInt32("Count");
+
+            return result;
+        }
+    }
+    #endregion
 
     #region CreateTable
     /// <summary>
